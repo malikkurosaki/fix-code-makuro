@@ -1,0 +1,127 @@
+{
+  "name": "fix-code-makuro",
+  "displayName": "Fix Code with makuro",
+  "description": "AI-powered code fixing and improvement using makuro",
+  "version": "1.0.4",
+  "publisher": "malik-kurosaki",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "claude",
+    "anthropic",
+    "code-fix",
+    "refactor",
+    "code-improvement",
+    "makuro"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "fixCode.open",
+        "title": "Fix Code with makuro",
+        "category": "Fix Code"
+      },
+      {
+        "command": "fixCode.setApiKey",
+        "title": "Set API Key",
+        "category": "Fix Code"
+      },
+      {
+        "command": "fixCode.resetApiKey",
+        "title": "Reset API Key",
+        "category": "Fix Code"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "fixCode.open",
+          "when": "editorHasSelection",
+          "group": "1_modification@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "fixCode.open",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "fixCode.setApiKey"
+        },
+        {
+          "command": "fixCode.resetApiKey"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "fixCode.open",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "editorTextFocus"
+      }
+    ],
+    "configuration": {
+      "title": "Fix Code",
+      "properties": {
+        "fixCode.model": {
+          "type": "string",
+          "default": "claude-sonnet-4-20250514",
+          "description": "Claude model to use for code fixing",
+          "enum": [
+            "claude-opus-4-5-20251101",
+            "claude-sonnet-4-5-20250929",
+            "claude-sonnet-4-20250514",
+            "claude-haiku-4-5-20251001"
+          ]
+        },
+        "fixCode.maxTokens": {
+          "type": "number",
+          "default": 4096,
+          "description": "Maximum tokens for Claude response",
+          "minimum": 1024,
+          "maximum": 8192
+        },
+        "fixCode.autoApply": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically apply fixes without confirmation"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.40.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {},
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/fix-code-extension"
+  },
+  "license": "MIT"
+}

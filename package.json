@@ -1,9 +1,9 @@
 {
   "name": "fix-code-makuro",
   "displayName": "Fix Code with makuro",
-  "description": "AI-powered code fixing and improvement using makuro",
-  "version": "1.0.4",
-  "publisher": "malik-kurosaki",
+  "description": "AI-powered code fixing and improvement using OpenRouter (Claude, GPT, Gemini, Llama)",
+  "version": "1.0.18",
+  "publisher": "malikkurosaki",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -14,15 +14,28 @@
   ],
   "keywords": [
     "ai",
+    "openrouter",
     "claude",
-    "anthropic",
+    "gpt",
+    "gemini",
+    "llama",
     "code-fix",
     "refactor",
     "code-improvement",
     "makuro"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:python",
+    "onLanguage:java",
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onLanguage:php",
+    "onLanguage:ruby",
+    "onLanguage:csharp",
+    "onLanguage:cpp"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -30,7 +43,8 @@
       {
         "command": "fixCode.open",
         "title": "Fix Code with makuro",
-        "category": "Fix Code"
+        "category": "Fix Code",
+        "icon": "$(wand)"
       },
       {
         "command": "fixCode.setApiKey",
@@ -41,13 +55,66 @@
         "command": "fixCode.resetApiKey",
         "title": "Reset API Key",
         "category": "Fix Code"
+      },
+      {
+        "command": "fixCode.selectModel",
+        "title": "Select Default Model",
+        "category": "Fix Code"
+      },
+      {
+        "command": "fixCode.clearCache",
+        "title": "Clear Project Cache",
+        "category": "Fix Code"
+      },
+      {
+        "command": "fixCode.clearAllCaches",
+        "title": "Clear All Caches",
+        "category": "Fix Code"
+      },
+      {
+        "command": "fixCode.cacheStats",
+        "title": "Show Cache Statistics",
+        "category": "Fix Code"
+      },
+      {
+        "command": "fixCode.showCurrentModel",
+        "title": "Show Current Model Info",
+        "category": "Fix Code"
+      },
+      {
+        "command": "fixCode.openTaskNotes",
+        "title": "Open Task Notes",
+        "category": "Fix Code"
+      },
+      {
+        "command": "fixCode.clearTaskNotes",
+        "title": "Clear Task Notes",
+        "category": "Fix Code"
+      },
+      {
+        "command": "fixCode.taskNotesStats",
+        "title": "Show Task Notes Statistics",
+        "category": "Fix Code"
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "fixCode.open",
+          "when": "editorTextFocus",
+          "group": "navigation",
+          "alt": "fixCode.open"
+        }
+      ],
       "editor/context": [
         {
           "command": "fixCode.open",
           "when": "editorHasSelection",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "fixCode.open",
+          "when": "editorTextFocus && !editorHasSelection",
           "group": "1_modification@1"
         }
       ],
@@ -61,6 +128,30 @@
         },
         {
           "command": "fixCode.resetApiKey"
+        },
+        {
+          "command": "fixCode.selectModel"
+        },
+        {
+          "command": "fixCode.clearCache"
+        },
+        {
+          "command": "fixCode.clearAllCaches"
+        },
+        {
+          "command": "fixCode.cacheStats"
+        },
+        {
+          "command": "fixCode.showCurrentModel"
+        },
+        {
+          "command": "fixCode.openTaskNotes"
+        },
+        {
+          "command": "fixCode.clearTaskNotes"
+        },
+        {
+          "command": "fixCode.taskNotesStats"
         }
       ]
     },
@@ -77,26 +168,124 @@
       "properties": {
         "fixCode.model": {
           "type": "string",
-          "default": "claude-sonnet-4-20250514",
-          "description": "Claude model to use for code fixing",
+          "default": "anthropic/claude-sonnet-4.5:beta",
+          "description": "AI model to use for code fixing (via OpenRouter)",
           "enum": [
-            "claude-opus-4-5-20251101",
-            "claude-sonnet-4-5-20250929",
-            "claude-sonnet-4-20250514",
-            "claude-haiku-4-5-20251001"
+            "anthropic/claude-opus-4.5:beta",
+            "anthropic/claude-sonnet-4.5:beta",
+            "anthropic/claude-3.5-sonnet",
+            "anthropic/claude-3-haiku",
+            "openai/gpt-4o",
+            "openai/gpt-4-turbo",
+            "google/gemini-pro-1.5",
+            "meta-llama/llama-3.1-70b-instruct"
+          ],
+          "enumDescriptions": [
+            "Claude Opus 4.5 - Most powerful Anthropic model",
+            "Claude Sonnet 4.5 - Best balance of speed and intelligence (Default)",
+            "Claude 3.5 Sonnet - Previous Sonnet version",
+            "Claude 3 Haiku - Fastest Claude model",
+            "GPT-4o - OpenAI's most advanced model",
+            "GPT-4 Turbo - Fast and capable OpenAI model",
+            "Gemini Pro 1.5 - Google's advanced model",
+            "Llama 3.1 70B - Meta's open source model"
           ]
         },
         "fixCode.maxTokens": {
           "type": "number",
           "default": 4096,
-          "description": "Maximum tokens for Claude response",
+          "description": "Maximum tokens for AI response",
           "minimum": 1024,
           "maximum": 8192
         },
         "fixCode.autoApply": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Automatically apply fixes without confirmation"
+        },
+        "fixCode.useSmartMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable smart mode with automatic complexity detection and caching (recommended)"
+        },
+        "fixCode.cacheDuration": {
+          "type": "number",
+          "default": 5,
+          "description": "Cache duration in minutes for project context",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "fixCode.enableValidation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic code validation before applying fixes (recommended)"
+        },
+        "fixCode.maxRetries": {
+          "type": "number",
+          "default": 2,
+          "description": "Maximum retry attempts if code validation fails",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "fixCode.showValidationDetails": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show validation results and error details"
+        },
+        "fixCode.allowPackageInstall": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow AI to automatically install npm packages when needed"
+        },
+        "fixCode.allowFileCreation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow AI to create new files in the project"
+        },
+        "fixCode.allowFolderCreation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow AI to create new folders in the project"
+        },
+        "fixCode.allowFileModification": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow AI to modify existing files (other than the selected code)"
+        },
+        "fixCode.allowScriptExecution": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow AI to run npm scripts (build, test, etc.) - Use with caution"
+        },
+        "fixCode.allowGitOperations": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow AI to perform git operations (add, commit) - Use with caution"
+        },
+        "fixCode.allowFormatting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow AI to format code automatically"
+        },
+        "fixCode.requireConfirmation": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require confirmation before executing autonomous actions"
+        },
+        "fixCode.enableWebSearch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow AI to search the web for up-to-date information, documentation, and error solutions"
+        },
+        "fixCode.enableTaskNotes": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic task notes to explain what the AI did (similar to Claude Code summaries)"
+        },
+        "fixCode.taskNotesFile": {
+          "type": "string",
+          "default": "MAKURO_NOTE.md",
+          "description": "File path for task notes (relative to workspace root or absolute path)"
         }
       }
     }
@@ -107,7 +296,9 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "package": "npm run compile && vsce package",
+    "verify-package": "npm run compile && node scripts/verify-package.js"
   },
   "devDependencies": {
     "@types/node": "^20.x",
@@ -121,7 +312,7 @@
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/fix-code-extension"
+    "url": "https://github.com/malikkurosaki/fix-code-makuro"
   },
   "license": "MIT"
 }

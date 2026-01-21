@@ -1,11 +1,48 @@
+# Source files (not needed in package)
+src/**
+**/tsconfig.json
+**/*.ts
+
+# Development files
 .vscode/**
 .vscode-test/**
-src/**
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md
-**/tsconfig.json
 **/eslint.config.mjs
+
+# Source maps (optional - include if you want debugging)
 **/*.map
-**/*.ts
+
+# Test files
+test/**
 **/.vscode-test.*
+
+# Build files
+node_modules/**
+.DS_Store
+.claude/**
+
+# Project specific
+extention/**
+xnote.js
+xnote.md
+
+# Package files
+*.vsix
+*.tgz
+*.gzip
+*.tgzip
+
+# Lock files
+package-lock.json
+yarn.lock
+
+# Documentation (optional - remove if you want to include)
+# Remove the # below if you DON'T want these in package
+# README.md
+# CHANGELOG.md
+# LICENSE
+
+# IMPORTANT: Make sure out/ folder is NOT excluded!
+# out/ folder contains compiled JavaScript files and MUST be included

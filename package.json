@@ -2,7 +2,7 @@
   "name": "fix-code-makuro",
   "displayName": "Fix Code with makuro",
   "description": "AI-powered code fixing and improvement using OpenRouter (Claude, GPT, Gemini, Llama)",
-  "version": "1.0.18",
+  "version": "1.0.20",
   "publisher": "malikkurosaki",
   "engines": {
     "vscode": "^1.80.0"

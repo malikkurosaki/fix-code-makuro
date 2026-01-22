@@ -172,7 +172,7 @@ async function writeTaskNoteFromResult(
 export function activate(context: vscode.ExtensionContext) {
   console.log("===================================");
   console.log("Fix Code with makuro - ACTIVATING");
-  console.log("Version: 1.0.17");
+  console.log("Version: 1.0.19");
   console.log("===================================");
 
   // Show activation notification (only on first install)
@@ -242,11 +242,17 @@ export function activate(context: vscode.ExtensionContext) {
           isFullFile = false;
         }
 
-        // 1. Ensure API Key exists
+        // 1. Save document context BEFORE async operations
+        // This ensures we can reopen/find the file even if user closes it
+        const documentUri = document.uri;
+        const documentPath = document.fileName;
+        const originalEditor = editor; // Keep reference but don't rely on it later
+
+        // 2. Ensure API Key exists
         const apiKey = await ensureApiKey(context);
         if (!apiKey) { return; }
 
-        // 2. File & workspace info
+        // 3. File & workspace info
         const fileName = path.basename(document.fileName);
         const filePath = document.fileName;
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(
@@ -254,7 +260,7 @@ export function activate(context: vscode.ExtensionContext) {
         );
         const workspacePath = workspaceFolder?.uri.fsPath ?? null;
 
-        // 3. Decoration (highlight)
+        // 4. Decoration (highlight) - only if editor still active
         const decoration = vscode.window.createTextEditorDecorationType({
           isWholeLine: true,
           backgroundColor: "rgba(80, 140, 255, 0.2)",
@@ -262,7 +268,10 @@ export function activate(context: vscode.ExtensionContext) {
         });
 
         try {
-          editor.setDecorations(decoration, [range]);
+          // Try to set decoration if editor still active
+          if (originalEditor && !originalEditor.document.isClosed) {
+            originalEditor.setDecorations(decoration, [range]);
+          }
 
           // 4. Prompt user
           const linesCount = range.end.line - range.start.line + 1;
@@ -355,7 +364,8 @@ export function activate(context: vscode.ExtensionContext) {
               );
             }
 
-            await applyCodeFix(editor, range, result.code);
+            // Apply fix - works even if file was closed/switched
+            await applyCodeFixSafe(documentUri, documentPath, range, result.code);
 
             // Write task note
             await writeTaskNoteFromResult(
@@ -387,7 +397,8 @@ export function activate(context: vscode.ExtensionContext) {
             );
 
             if (action === "Apply Anyway") {
-              await applyCodeFix(editor, range, result.code);
+              // Apply fix - works even if file was closed/switched
+              await applyCodeFixSafe(documentUri, documentPath, range, result.code);
 
               // Write task note even for failed validation
               await writeTaskNoteFromResult(
@@ -1180,8 +1191,13 @@ function isOutputComplete(output: string): boolean {
  * ============================================================
  */
 
-async function applyCodeFix(
-  editor: vscode.TextEditor,
+/**
+ * Apply code fix safely - works even if file was closed or switched
+ * This is the new preferred method that doesn't rely on editor being active
+ */
+async function applyCodeFixSafe(
+  documentUri: vscode.Uri,
+  documentPath: string,
   range: vscode.Range,
   fixedCode: string
 ): Promise<void> {
@@ -1194,10 +1210,7 @@ async function applyCodeFix(
 
   if (autoApply) {
     // Auto apply without confirmation
-    await editor.edit((editBuilder) => {
-      editBuilder.replace(range, cleanedCode);
-    });
-    vscode.window.showInformationMessage("Code replaced successfully!");
+    await applyCodeFixToDocument(documentUri, range, cleanedCode, documentPath);
     return;
   }
 
@@ -1216,20 +1229,153 @@ async function applyCodeFix(
 
   switch (action) {
     case "Replace":
-      await editor.edit((editBuilder) => {
-        editBuilder.replace(range, cleanedCode);
-      });
-      vscode.window.showInformationMessage("Code replaced successfully!");
+      await applyCodeFixToDocument(documentUri, range, cleanedCode, documentPath);
       break;
 
     case "Show Diff":
-      await showDiff(editor.document, range, cleanedCode);
+      await showDiffWithReopenSupport(documentUri, range, cleanedCode, documentPath);
       break;
 
     case "Copy to Clipboard":
       await vscode.env.clipboard.writeText(cleanedCode);
       vscode.window.showInformationMessage("Code copied to clipboard!");
       break;
+  }
+}
+
+/**
+ * Legacy wrapper for backward compatibility
+ * @deprecated Use applyCodeFixSafe instead
+ */
+async function applyCodeFix(
+  editor: vscode.TextEditor,
+  range: vscode.Range,
+  fixedCode: string
+): Promise<void> {
+  await applyCodeFixSafe(
+    editor.document.uri,
+    editor.document.fileName,
+    range,
+    fixedCode
+  );
+}
+
+/**
+ * Apply code fix to document - reopens file if closed
+ */
+async function applyCodeFixToDocument(
+  documentUri: vscode.Uri,
+  range: vscode.Range,
+  fixedCode: string,
+  documentPath: string
+): Promise<void> {
+  try {
+    const fileName = path.basename(documentPath);
+    let needsReopen = false;
+
+    // Try to find the document in open editors
+    let document = vscode.workspace.textDocuments.find(
+      (doc) => doc.uri.toString() === documentUri.toString()
+    );
+
+    // If document not found or closed, open it
+    if (!document) {
+      console.log(`Document not open, reopening: ${documentPath}`);
+      needsReopen = true;
+
+      // Notify user we're reopening their file
+      vscode.window.showInformationMessage(
+        `📂 Reopening ${fileName} to apply fix...`
+      );
+
+      document = await vscode.workspace.openTextDocument(documentUri);
+    }
+
+    // Find or create editor for this document
+    let editor = vscode.window.visibleTextEditors.find(
+      (e) => e.document.uri.toString() === documentUri.toString()
+    );
+
+    if (!editor) {
+      // Document exists but not visible, show it
+      console.log("Document exists but not visible, showing...");
+
+      if (!needsReopen) {
+        // File was open but switched to another tab
+        vscode.window.showInformationMessage(
+          `📄 Switching to ${fileName} to apply fix...`
+        );
+      }
+
+      editor = await vscode.window.showTextDocument(document, {
+        preview: false,
+        preserveFocus: false,
+      });
+    }
+
+    // Apply the edit
+    const success = await editor.edit((editBuilder) => {
+      editBuilder.replace(range, fixedCode);
+    });
+
+    if (success) {
+      let message = "✅ Code replaced successfully!";
+      if (needsReopen) {
+        message += ` (File was reopened)`;
+      }
+      vscode.window.showInformationMessage(message);
+    } else {
+      vscode.window.showErrorMessage(
+        "Failed to apply code fix. Please try again."
+      );
+    }
+  } catch (error) {
+    console.error("Error applying code fix:", error);
+
+    // Offer to copy to clipboard as fallback
+    const action = await vscode.window.showErrorMessage(
+      `Failed to apply fix to ${path.basename(documentPath)}. Copy to clipboard instead?`,
+      "Copy to Clipboard",
+      "Cancel"
+    );
+
+    if (action === "Copy to Clipboard") {
+      await vscode.env.clipboard.writeText(fixedCode);
+      vscode.window.showInformationMessage(
+        "📋 Code copied to clipboard. You can paste it manually."
+      );
+    }
+  }
+}
+
+/**
+ * Show diff with support for reopening closed files
+ */
+async function showDiffWithReopenSupport(
+  documentUri: vscode.Uri,
+  range: vscode.Range,
+  fixedCode: string,
+  documentPath: string
+): Promise<void> {
+  try {
+    // Try to find the document
+    let document = vscode.workspace.textDocuments.find(
+      (doc) => doc.uri.toString() === documentUri.toString()
+    );
+
+    // If not found, open it
+    if (!document) {
+      console.log(`Document not open for diff, reopening: ${documentPath}`);
+      document = await vscode.workspace.openTextDocument(documentUri);
+    }
+
+    // Show diff
+    await showDiff(document, range, fixedCode);
+  } catch (error) {
+    console.error("Error showing diff:", error);
+    vscode.window.showErrorMessage(
+      `Failed to show diff for ${path.basename(documentPath)}`
+    );
   }
 }
 
